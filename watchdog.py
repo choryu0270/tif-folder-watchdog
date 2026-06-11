@@ -1,23 +1,15 @@
 from math import ceil
 from pathlib import Path
+import argparse
 import re
 import time
 
-from IPython.display import display
 import matplotlib.pyplot as plt
 import numpy as np
 import tifffile as tiff
 
 
-# Change the colormap here if needed, for example: "gray", "viridis", "turbo", "inferno".
-WATCH_COLORMAP = "viridis"
-
-# Folder for saved PNG figures.
-WATCH_PNG_OUTPUT_FOLDER = Path("./pngs")
-WATCH_PNG_OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
-
-
-def pick_display_plane_for_watch(array, band=0):
+def pick_display_plane(array, band=0):
     """Select a displayable 2D plane from a 2D, 3D, or higher-dimensional TIF."""
     arr = np.asarray(array)
 
@@ -34,10 +26,10 @@ def pick_display_plane_for_watch(array, band=0):
     while arr.ndim > 3:
         arr = arr[0]
 
-    return pick_display_plane_for_watch(arr, band=band)
+    return pick_display_plane(arr, band=band)
 
 
-def robust_limits_for_watch(array, lower=2, upper=98):
+def robust_limits(array, lower=2, upper=98):
     """Use percentiles to improve contrast and reduce the effect of extreme values."""
     arr = np.asarray(array)
 
@@ -55,16 +47,27 @@ def robust_limits_for_watch(array, lower=2, upper=98):
     return vmin, vmax
 
 
-def plot_tif_folder_for_watch(folder, colormap=WATCH_COLORMAP, output_folder=WATCH_PNG_OUTPUT_FOLDER):
-    """Plot all TIF files in one folder, save the figure as PNG, and return the figure."""
-    folder = Path(folder)
-    output_folder = Path(output_folder)
-    output_folder.mkdir(parents=True, exist_ok=True)
-    tif_files = sorted(list(folder.glob("*.tif")) + list(folder.glob("*.tiff")))
+def plot_tif_folder(
+    tif_folder=Path("../extra_mmm_cache/r0034"),
+    colormap="viridis",
+    png_output_folder=Path("./pngs"),
+    flip_up_down=True,
+    show_figure=False,
+):
+    """Plot all TIF files in a folder and save the figure as a PNG."""
+    tif_folder = Path(tif_folder)
+    png_output_folder = Path(png_output_folder)
+    png_output_folder.mkdir(parents=True, exist_ok=True)
+
+    tif_files = sorted(
+        list(tif_folder.glob("*.tif")) + list(tif_folder.glob("*.tiff"))
+    )
+
+    if not tif_folder.exists():
+        raise FileNotFoundError(f"Folder not found: {tif_folder.resolve()}")
 
     if not tif_files:
-        print(f"No .tif or .tiff files found in: {folder.resolve()}")
-        return None
+        raise FileNotFoundError(f"No .tif or .tiff files found in: {tif_folder.resolve()}")
 
     n_files = len(tif_files)
     n_cols = min(4, n_files)
@@ -79,31 +82,50 @@ def plot_tif_folder_for_watch(folder, colormap=WATCH_COLORMAP, output_folder=WAT
 
     for ax, tif_path in zip(axes.ravel(), tif_files):
         tif_img = tiff.imread(tif_path)
-        tif_display = pick_display_plane_for_watch(tif_img, band=0)
+        tif_display = pick_display_plane(tif_img, band=0)
+
+        if flip_up_down:
+            tif_display = np.flipud(tif_display)
 
         if tif_display.ndim == 3 and tif_display.shape[-1] in (3, 4):
             ax.imshow(tif_display)
         else:
-            vmin, vmax = robust_limits_for_watch(tif_display)
-            image = ax.imshow(tif_display, cmap=colormap, vmin=vmin, vmax=vmax)
+            vmin, vmax = robust_limits(tif_display)
+            image = ax.imshow(
+                tif_display,
+                cmap=colormap,
+                vmin=vmin,
+                vmax=vmax,
+                origin="lower",
+            )
             fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
 
         ax.set_title(tif_path.name, fontsize=9)
-        ax.axis("off")
+        ax.set_xlabel("X pixel")
+        ax.set_ylabel("Y pixel")
+        ax.tick_params(axis="both", which="both", labelsize=8)
 
     for ax in axes.ravel()[n_files:]:
         ax.axis("off")
 
-    fig.suptitle(f"TIF files in {folder}", fontsize=14)
+    fig.suptitle(f"TIF files in {tif_folder}", fontsize=14)
     plt.tight_layout()
-    png_output_path = output_folder / f"{folder.name}.png"
+
+    png_output_path = png_output_folder / f"{tif_folder.name}.png"
     fig.savefig(png_output_path, dpi=200, bbox_inches="tight")
+    if show_figure:
+        plt.show()
+    else:
+        plt.close(fig)
+
+    print(f"Displayed {n_files} TIF file(s).")
     print(f"Saved PNG figure to: {png_output_path}")
-    return fig
+
+    return png_output_path
 
 
 def r_folder_number(folder):
-    """Return the numeric part of an r-folder name such as r0009, or None."""
+    """Return the numeric part of an r-folder name such as r0001, or None."""
     match = re.fullmatch(r"r(\d{4,})", folder.name)
     if match is None:
         return None
@@ -112,22 +134,24 @@ def r_folder_number(folder):
 
 def watch_new_r_folders(
     parent_folder=Path("../extra_mmm_cache"),
-    start_after="r0008",
+    start_after="r0000",
     poll_seconds=5,
     settle_seconds=30,
-    colormap=WATCH_COLORMAP,
+    colormap="viridis",
+    png_output_folder=Path("./pngs"),
+    flip_up_down=True,
 ):
-    """Monitor for new r-folders and plot all TIF files inside each new folder."""
+    """Monitor for r-folders and plot all TIF files inside each detected folder."""
     parent_folder = Path(parent_folder)
     start_number = r_folder_number(Path(start_after))
     plotted = set()
     reported_waiting = set()
 
     if start_number is None:
-        raise ValueError("start_after must look like 'r0008'.")
+        raise ValueError("start_after must look like 'r0000', 'r0008', or 'r0034'.")
 
-    print(f"Watching for new folders after {start_after} in: {parent_folder.resolve()}")
-    print("Stop monitoring with Kernel > Interrupt, or press the stop button in JupyterLab.")
+    print(f"Watching for r-folders after {start_after} in: {parent_folder.resolve()}")
+    print("Stop monitoring with Ctrl+C.")
 
     try:
         while True:
@@ -157,23 +181,73 @@ def watch_new_r_folders(
                 print(f"Waiting {settle_seconds} seconds before plotting, so late files can arrive...")
                 time.sleep(settle_seconds)
 
-                print(f"Plotting new folder: {folder}")
-                fig = plot_tif_folder_for_watch(folder, colormap=colormap)
-                if fig is not None:
-                    display(fig)
-                    plt.close(fig)
-                    plotted.add(folder)
+                print(f"Plotting folder: {folder}")
+                plot_tif_folder(
+                    tif_folder=folder,
+                    colormap=colormap,
+                    png_output_folder=png_output_folder,
+                    flip_up_down=flip_up_down,
+                    show_figure=False,
+                )
+                plotted.add(folder)
 
             time.sleep(poll_seconds)
     except KeyboardInterrupt:
         print("Monitoring stopped.")
 
 
-# Run this cell to start monitoring.
-watch_new_r_folders(
-    parent_folder=Path("../extra_mmm_cache"),
-    start_after="r0030",
-    poll_seconds=5,
-    settle_seconds=10,
-    colormap=WATCH_COLORMAP,
-)
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Monitor r-folders and save PNG summary figures for TIF files."
+    )
+    parser.add_argument(
+        "--parent-folder",
+        default="../extra_mmm_cache",
+        help="Parent folder containing r0001, r0002, ... folders.",
+    )
+    parser.add_argument(
+        "--start-after",
+        default="r0000",
+        help="Only process folders with a number greater than this value.",
+    )
+    parser.add_argument(
+        "--poll-seconds",
+        type=float,
+        default=5,
+        help="Seconds between checks for new folders.",
+    )
+    parser.add_argument(
+        "--settle-seconds",
+        type=float,
+        default=30,
+        help="Seconds to wait after TIF files first appear before plotting.",
+    )
+    parser.add_argument(
+        "--colormap",
+        default="viridis",
+        help='Matplotlib colormap, for example "gray", "viridis", "turbo", or "inferno".',
+    )
+    parser.add_argument(
+        "--png-output-folder",
+        default="./pngs",
+        help="Folder where PNG summary figures will be saved.",
+    )
+    parser.add_argument(
+        "--no-flip-up-down",
+        action="store_true",
+        help="Disable upside-down flipping of each image.",
+    )
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    watch_new_r_folders(
+        parent_folder=Path(args.parent_folder),
+        start_after=args.start_after,
+        poll_seconds=args.poll_seconds,
+        settle_seconds=args.settle_seconds,
+        colormap=args.colormap,
+        png_output_folder=Path(args.png_output_folder),
+        flip_up_down=not args.no_flip_up_down,
+    )

@@ -10,28 +10,28 @@ pip install -r requirements.txt
 
 ## Run
 
-Edit the configuration at the bottom of `watchdog.py`:
-
-```python
-watch_new_r_folders(
-    parent_folder=Path("../extra_mmm_cache"),
-    start_after="r0030",
-    poll_seconds=5,
-    settle_seconds=10,
-    colormap=WATCH_COLORMAP,
-)
-```
-
-Then run:
+Run with the default settings:
 
 ```bash
 python watchdog.py
 ```
 
+Common options:
+
+```bash
+python watchdog.py \
+  --parent-folder ../extra_mmm_cache \
+  --start-after r0034 \
+  --poll-seconds 5 \
+  --settle-seconds 30 \
+  --colormap viridis \
+  --png-output-folder ./pngs
+```
+
 For background execution:
 
 ```bash
-nohup python watchdog.py > watch.log 2>&1 &
+nohup python watchdog.py --start-after r0034 --settle-seconds 30 > watch.log 2>&1 &
 ```
 
 Stop it with:
@@ -48,4 +48,3 @@ PNG summary figures are saved to:
 ```text
 ./pngs/
 ```
-
