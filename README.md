@@ -26,10 +26,10 @@ python watchdog.py \
   --settle-seconds 30 \
   --colormap viridis \
   --png-output-folder ./pngs \
-  --flip-patterns LT_CAM_5 A23_CAM_6
+  --flip-patterns LT_CAM5_mean LT_CAM_5 A23_CAM_6
 ```
 
-By default, only files whose names match `LT_CAM_5` or `A23_CAM_6` are flipped upside down. The generated figure title includes the plot time in `HH:MM/DD.MM.YYYY` format.
+By default, only files whose names match `LT_CAM5_mean`, `LT_CAM_5`, or `A23_CAM_6` are flipped upside down. The generated figure title includes the plot time in `HH:MM/DD.MM.YYYY` format.
 
 For background execution:
 
