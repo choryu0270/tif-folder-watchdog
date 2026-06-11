@@ -87,8 +87,11 @@ def plot_tif_folder(
         if flip_up_down:
             tif_display = np.flipud(tif_display)
 
+        height, width = tif_display.shape[:2]
+        extent = [0, width, 0, height]
+
         if tif_display.ndim == 3 and tif_display.shape[-1] in (3, 4):
-            ax.imshow(tif_display)
+            ax.imshow(tif_display, extent=extent)
         else:
             vmin, vmax = robust_limits(tif_display)
             image = ax.imshow(
@@ -96,6 +99,7 @@ def plot_tif_folder(
                 cmap=colormap,
                 vmin=vmin,
                 vmax=vmax,
+                extent=extent,
             )
             fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
 
