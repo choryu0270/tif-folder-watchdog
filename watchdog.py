@@ -1,6 +1,7 @@
 from math import ceil
 from pathlib import Path
 import argparse
+from datetime import datetime
 import re
 import time
 
@@ -47,11 +48,25 @@ def robust_limits(array, lower=2, upper=98):
     return vmin, vmax
 
 
+def normalize_name(text):
+    """Normalize names so A23_CAM 6, A23-CAM-6, and A23_CAM_6 match each other."""
+    return re.sub(r"[^A-Z0-9]+", "_", text.upper()).strip("_")
+
+
+def should_flip_tif(tif_path, flip_name_patterns):
+    """Return True when a TIF filename matches one of the configured flip patterns."""
+    normalized_name = normalize_name(Path(tif_path).name)
+    return any(
+        normalize_name(pattern) in normalized_name
+        for pattern in flip_name_patterns
+    )
+
+
 def plot_tif_folder(
     tif_folder=Path("../extra_mmm_cache/r0034"),
     colormap="viridis",
     png_output_folder=Path("./pngs"),
-    flip_up_down=True,
+    flip_name_patterns=("LT_CAM_5", "A23_CAM_6"),
     show_figure=False,
 ):
     """Plot all TIF files in a folder and save the figure as a PNG."""
@@ -72,6 +87,7 @@ def plot_tif_folder(
     n_files = len(tif_files)
     n_cols = min(4, n_files)
     n_rows = ceil(n_files / n_cols)
+    plot_time = datetime.now().strftime("%H:%M/%d.%m.%Y")
 
     fig, axes = plt.subplots(
         n_rows,
@@ -84,7 +100,7 @@ def plot_tif_folder(
         tif_img = tiff.imread(tif_path)
         tif_display = pick_display_plane(tif_img, band=0)
 
-        if flip_up_down:
+        if should_flip_tif(tif_path, flip_name_patterns):
             tif_display = np.flipud(tif_display)
 
         height, width = tif_display.shape[:2]
@@ -111,7 +127,7 @@ def plot_tif_folder(
     for ax in axes.ravel()[n_files:]:
         ax.axis("off")
 
-    fig.suptitle(f"TIF files in {tif_folder}", fontsize=14)
+    fig.suptitle(f"TIF files in {tif_folder}\nPlot time: {plot_time}", fontsize=14)
     plt.tight_layout()
 
     png_output_path = png_output_folder / f"{tif_folder.name}.png"
@@ -142,7 +158,7 @@ def watch_new_r_folders(
     settle_seconds=30,
     colormap="viridis",
     png_output_folder=Path("./pngs"),
-    flip_up_down=True,
+    flip_name_patterns=("LT_CAM_5", "A23_CAM_6"),
 ):
     """Monitor for r-folders and plot all TIF files inside each detected folder."""
     parent_folder = Path(parent_folder)
@@ -189,7 +205,7 @@ def watch_new_r_folders(
                     tif_folder=folder,
                     colormap=colormap,
                     png_output_folder=png_output_folder,
-                    flip_up_down=flip_up_down,
+                    flip_name_patterns=flip_name_patterns,
                     show_figure=False,
                 )
                 plotted.add(folder)
@@ -236,9 +252,10 @@ def parse_args():
         help="Folder where PNG summary figures will be saved.",
     )
     parser.add_argument(
-        "--no-flip-up-down",
-        action="store_true",
-        help="Disable upside-down flipping of each image.",
+        "--flip-patterns",
+        nargs="*",
+        default=["LT_CAM_5", "A23_CAM_6"],
+        help="Filename patterns to flip upside down. Use an empty value to disable flipping.",
     )
     return parser.parse_args()
 
@@ -252,5 +269,5 @@ if __name__ == "__main__":
         settle_seconds=args.settle_seconds,
         colormap=args.colormap,
         png_output_folder=Path(args.png_output_folder),
-        flip_up_down=not args.no_flip_up_down,
+        flip_name_patterns=args.flip_patterns,
     )
