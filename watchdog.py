@@ -73,7 +73,7 @@ def plot_tif_folder(
     tif_folder=Path("../extra_mmm_cache/r0034"),
     colormap="viridis",
     png_output_folder=Path("./pngs"),
-    flip_name_patterns=("LT_CAM5_mean", "LT_CAM_5", "A23_CAM_6"),
+    flip_name_patterns=("LT_CAM5_mean", "LT_CAM_5", "A23_CAM6_mean", "A23_CAM_6"),
     show_figure=False,
 ):
     """Plot all TIF files in a folder and save the figure as a PNG."""
@@ -167,7 +167,7 @@ def watch_new_r_folders(
     settle_seconds=30,
     colormap="viridis",
     png_output_folder=Path("./pngs"),
-    flip_name_patterns=("LT_CAM5_mean", "LT_CAM_5", "A23_CAM_6"),
+    flip_name_patterns=("LT_CAM5_mean", "LT_CAM_5", "A23_CAM6_mean", "A23_CAM_6"),
 ):
     """Monitor for r-folders and plot all TIF files inside each detected folder."""
     parent_folder = Path(parent_folder)
@@ -263,7 +263,7 @@ def parse_args():
     parser.add_argument(
         "--flip-patterns",
         nargs="*",
-        default=["LT_CAM5_mean", "LT_CAM_5", "A23_CAM_6"],
+        default=["LT_CAM5_mean", "LT_CAM_5", "A23_CAM6_mean", "A23_CAM_6"],
         help="Filename patterns to flip upside down. Use an empty value to disable flipping.",
     )
     return parser.parse_args()
