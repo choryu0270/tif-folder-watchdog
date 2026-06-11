@@ -96,7 +96,6 @@ def plot_tif_folder(
                 cmap=colormap,
                 vmin=vmin,
                 vmax=vmax,
-                origin="lower",
             )
             fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
 
