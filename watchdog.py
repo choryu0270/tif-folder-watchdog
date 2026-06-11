@@ -53,11 +53,18 @@ def normalize_name(text):
     return re.sub(r"[^A-Z0-9]+", "_", text.upper()).strip("_")
 
 
+def compact_name(text):
+    """Remove all separators so LT_Cam 5 and LTCam5 match each other."""
+    return re.sub(r"[^A-Z0-9]+", "", text.upper())
+
+
 def should_flip_tif(tif_path, flip_name_patterns):
     """Return True when a TIF filename matches one of the configured flip patterns."""
     normalized_name = normalize_name(Path(tif_path).name)
+    compacted_name = compact_name(Path(tif_path).name)
     return any(
         normalize_name(pattern) in normalized_name
+        or compact_name(pattern) in compacted_name
         for pattern in flip_name_patterns
     )
 
@@ -100,7 +107,9 @@ def plot_tif_folder(
         tif_img = tiff.imread(tif_path)
         tif_display = pick_display_plane(tif_img, band=0)
 
-        if should_flip_tif(tif_path, flip_name_patterns):
+        flip_this_image = should_flip_tif(tif_path, flip_name_patterns)
+        if flip_this_image:
+            print(f"Flipping upside down: {tif_path.name}")
             tif_display = np.flipud(tif_display)
 
         height, width = tif_display.shape[:2]
